@@ -1,25 +1,53 @@
-# Railway Templates
+from flask import Flask, request, jsonify
+import sqlite3
 
-Railway Templates are an easy way to deploy your favorite apps to Railway. You can deploy templates from our [templates page](https://railway.app/templates).
+app = Flask(__name__)
 
-This repository handles GitHub focused discussions about Railway templates. We handle Template bounties, feature requests, and bug reports here.
+def init_db():
+    with sqlite3.connect("os.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS ordens (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            cliente TEXT,
+                            descricao TEXT,
+                            status TEXT)''')
+        conn.commit()
 
-To submit a Template, [use the publishing flow within the Templates page tied to your account.](https://docs.railway.app/reference/templates#publishing-a-template)
+@app.route("/os", methods=["POST"])
+def criar_os():
+    dados = request.json
+    with sqlite3.connect("os.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO ordens (cliente, descricao, status) VALUES (?, ?, ?)",
+                       (dados["cliente"], dados["descricao"], "Aberto"))
+        conn.commit()
+    return jsonify({"mensagem": "Ordem de serviço criada com sucesso!"})
 
-This repository's former purpose was created to been created to allow users to submit their templates to the list of templates displayed on our [templates page](https://railway.app/templates). We have since moved to a new system that allows users to submit templates directly from the Railway UI.
+@app.route("/os", methods=["GET"])
+def listar_os():
+    with sqlite3.connect("os.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM ordens")
+        ordens = cursor.fetchall()
+    return jsonify(ordens)
 
-## Creating a template
+@app.route("/os/<int:os_id>", methods=["PUT"])
+def atualizar_os(os_id):
+    dados = request.json
+    with sqlite3.connect("os.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE ordens SET status=? WHERE id=?", (dados["status"], os_id))
+        conn.commit()
+    return jsonify({"mensagem": "Ordem de serviço atualizada!"})
 
-You can create a template by visiting our [button page](https://railway.app/button) or by converting an existing project into a template via the project settings page. Please note that templates can only be created if the services are linked to a public repository. If you link to a private repository, the template will not work.
+@app.route("/os/<int:os_id>", methods=["DELETE"])
+def excluir_os(os_id):
+    with sqlite3.connect("os.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM ordens WHERE id=?", (os_id,))
+        conn.commit()
+    return jsonify({"mensagem": "Ordem de serviço excluída!"})
 
-Using the button, you can create a template that can deploy multiple services and databases. You can configure the environment variables, start command, health-check path and root directory for each service while also specifying whether or not we should attach a domain to the service.
-
-## Submitting a template
-
-To submit a template for viewing, you can use the publish flow within the product like so. 
-
-Once approved, your template will show up on our [templates page](<(https://railway.app/templates)>) with the `Community` tag.
-
-## Template Bounties
-
-We have a bounty program for templates. If you create a template that we think is awesome, we'll pay you a set amount. You can find more information about the bounty program on our Bounty project [linked in this repo.](https://github.com/orgs/railwayapp/projects/2)
+if __name__ == "__main__":
+    init_db()
+    app.run(debug=True)
